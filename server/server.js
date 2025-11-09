@@ -20,12 +20,17 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors());
+const allowedOrigin = (process.env.ALLOWED_ORIGIN || '*').toLowerCase();
+const corsOptions = allowedOrigin === '*' ? {} : { origin: allowedOrigin };
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+//Serve Frontend static files
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Log requests in development mode
 if (process.env.NODE_ENV === 'development') {
@@ -41,8 +46,13 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/auth', authRoutes);
 
 // Root route
-app.get('/', (req, res) => {
-  res.send('MERN Blog API is running');
+app.get('/', (req,res) => {
+  const indexpath = path.join(__dirname, 'public', 'index.html');
+  res.sendFile(indexpath, (err) => {
+    if (err) {
+      res.type('text').send('MERN Blog API is running');
+    }
+  });
 });
 
 // Error handling middleware
@@ -55,8 +65,12 @@ app.use((err, req, res, next) => {
 });
 
 // Connect to MongoDB and start server
-mongoose
-  .connect(process.env.MONGODB_URI)
+  const mongoUri = process.env.MONGODB_URI || process.env.MONGOURI || 'mongodb://localhost:27017/mern-blog';
+  if (!process.env.MONGODB_URI && !process.env.MONGOURI) {
+    console.warn('No MONGODB_URI or MONGOURI found in env - using local fallback:', mongoUri);
+  }
+  mongoose
+   .connect(mongoUri)
   .then(() => {
     console.log('Connected to MongoDB');
     app.listen(PORT, () => {
